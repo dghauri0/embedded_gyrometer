@@ -1,12 +1,17 @@
 #include <mbed.h>
 
-/* Gyroscope Control Register Addresses */
+/* START: Gyroscope Register Addresses */
+
+// Control Registers
 #define CTRL_REG1 0x20
 #define CTRL_REG2 0x21
 #define CTRL_REG3 0x22
 #define CTRL_REG4 0x23
 
-/* Gyroscope Control Register Configurations */
+/* END: Gyroscope Register Addresses */
+
+
+/* START: Gyroscope Control Register Configurations */
 
 // CTRL_REG1
 // +-----+-----+-----+-----+----+-----+-----+-----+
@@ -38,11 +43,16 @@
 // Set full scale selection to 500 dps.
 #define CTRL_REG4_CONFIG 0b0'0'01'0'00'0
 
+/* END: Gyroscope Control Register Configurations */
 
+
+void data_rdy_int() {
+
+}
 
 int main() {
 
-    /* SPI Initialization */
+    /* START: SPI Initialization and Setup */
 
     // PF_9 --> Gyroscope SPI MOSI Pin
     // PF_8 --> Gyroscope SPI MISO Pin
@@ -50,7 +60,29 @@ int main() {
     // Using GPIO SSEL Line.
     SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel);
 
-    
+    // 8-bits per SPI frame.
+    // Clock polarity and phase mode, both 1.
+    spi.format(8, 3);
+
+    // Default SPI bus clock frequency (1 MHz).
+    spi.frequency(1'000'000);
+
+    /* END: SPI Initialization and Setup */
+
+
+    /* START: Interrupt Initialization */
+
+    // PA_2 --> Gyroscope INT2 Pin
+    InterruptIn int2(PA_2, PullDown);
+
+    // Set interrupt 2 to trigger routine on rising edge.
+    int2.rise(&data_rdy_int);
+
+    /* END: Interrupt Initialization */
+
+    while(1) {
+        
+    }
 
     return 0;
 }
