@@ -10,9 +10,7 @@
 LCD_DISCO_F429ZI lcd;
 
 //buffer for holding displayed text strings
-char display_buf[2][60];
-uint32_t graph_width=lcd.GetXSize()-2*GRAPH_PADDING;
-uint32_t graph_height=graph_width;
+char display_buf[9][60];
 
 //sets the background layer 
 //to be visible, transparent, and
@@ -33,26 +31,6 @@ void setup_foreground_layer(){
     lcd.Clear(LCD_COLOR_BLACK);
     lcd.SetBackColor(LCD_COLOR_BLACK);
     lcd.SetTextColor(LCD_COLOR_LIGHTGREEN);
-}
-
-//draws a rectangle with horizontal tick marks
-//on the background layer. The spacing between tick
-//marks in pixels is taken as a parameter
-void draw_graph_window(uint32_t horiz_tick_spacing){
-  lcd.SelectLayer(BACKGROUND);
-  
-  lcd.DrawRect(GRAPH_PADDING,GRAPH_PADDING,graph_width,graph_width);
-  //draw the x-axis tick marks
-  for (int32_t i = 0 ; i < graph_width;i+=horiz_tick_spacing){
-    lcd.DrawVLine(GRAPH_PADDING+i,graph_height,GRAPH_PADDING);
-  }
-}
-
-//maps inputY in the range minVal to maxVal, to a y-axis value pixel in the range
-//minPixelY to MaxPixelY
-uint16_t mapPixelY(float inputY,float minVal, float maxVal, int32_t minPixelY, int32_t maxPixelY){
-  const float mapped_pixel_y=(float)maxPixelY-(inputY)/(maxVal-minVal)*((float)maxPixelY-(float)minPixelY);
-  return mapped_pixel_y;
 }
 
 /* END: LCD Configuration */
@@ -162,6 +140,14 @@ int main() {
 
     /* END: Interrupt Initialization and Setup */
 
+    // Establish communicating device (read WHOAMI register).
+    write_buffer[0] = 0x8f;
+    spi.transfer(write_buffer, 2, read_buffer, 2, spi_cb);
+    flags.wait_all(SPI_FLAG);
+    //thread_sleep_for(5000);
+    printf("Gyroscope Identifier (WHOAMI) = 0x%X\n", read_buffer[1]);
+    //thread_sleep_for(5000);
+
     /* START: Write configurations to control registers. */
 
     // CTRL_REG1
@@ -194,21 +180,22 @@ int main() {
     /* START: LCD-related */
 
     setup_background_layer();
-
     setup_foreground_layer();
 
     //creates c-strings in the display buffers, in preparation
     //for displaying them on the screen
-    snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
-    snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
+    // snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
+    // snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
+    snprintf(display_buf[0],60,"The Embedded");
+    snprintf(display_buf[1],60,"Gyrometer");
     lcd.SelectLayer(FOREGROUND);
     //display the buffered string on the screen
-    lcd.DisplayStringAt(0, LINE(16), (uint8_t *)display_buf[1], LEFT_MODE);
-    lcd.DisplayStringAt(0, LINE(17), (uint8_t *)display_buf[0], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
 
     //draw the graph window on the background layer
     // with x-axis tick marks every 10 pixels
-    draw_graph_window(10);
+    //draw_graph_window(10);
 
 
     lcd.SelectLayer(FOREGROUND); 
@@ -238,8 +225,29 @@ int main() {
         printf(">x_axis:%4.5f|g\n", gx);
         printf(">y_axis:%4.5f|g\n", gy);
         printf(">z_axis:%4.5f|g\n", gz);
+ 
+        snprintf(display_buf[5],60,"X-AXIS: ");
+        snprintf(display_buf[6],60,"Y-AXIS: ");
+        snprintf(display_buf[7],60,"Z-AXIS: ");
 
-        thread_sleep_for(100);       
+        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[5], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
+
+        snprintf(display_buf[2],60,"%4.5f|g", gx);
+        snprintf(display_buf[3],60,"%4.5f|g", gy);
+        snprintf(display_buf[4],60,"%4.5f|g", gz);
+
+        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
+
+        thread_sleep_for(100); 
+        
+        snprintf(display_buf[8],60,"          ");
+        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
     }
 
     return 0;
