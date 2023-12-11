@@ -127,8 +127,12 @@ int main() {
 
     /* END: Write configurations to control registers. */
 
+    if(!(flags.get() & DATA_RDY_FLAG) && (int2.read() == 1)) {
+        flags.set(DATA_RDY_FLAG);
+    }
+
     while(1) {
-        uint16_t raw_gx, raw_gy, raw_gz;
+        int16_t raw_gx, raw_gy, raw_gz;
         float gx, gy, gz;
 
         flags.wait_all(DATA_RDY_FLAG);
@@ -137,7 +141,7 @@ int main() {
         spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
         flags.wait_all(SPI_FLAG);
 
-        //Process raw data
+        // Process raw data
         raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
         raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
         raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
@@ -145,13 +149,11 @@ int main() {
         gx = ((float)raw_gx) * SCALING_FACTOR;
         gy = ((float)raw_gy) * SCALING_FACTOR;
         gz = ((float)raw_gz) * SCALING_FACTOR;
-
-        //No Filter
         
-        printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
-        printf(">x_axis_raw:%4.5f|g\n", gx);
-        printf(">y_axis_raw:%4.5f|g\n", gy);
-        printf(">z_axis_raw:%4.5f|g\n", gz);
+        //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
+        printf(">x_axis:%4.5f|g\n", gx);
+        printf(">y_axis:%4.5f|g\n", gy);
+        printf(">z_axis:%4.5f|g\n", gz);
 
         thread_sleep_for(100);       
     }
