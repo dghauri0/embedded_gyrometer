@@ -224,10 +224,14 @@ int main() {
         gz = ((float)raw_gz) * SCALING_FACTOR;
         
         //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
-        printf(">x_axis:%4.5f|g\n", gx);
-        printf(">y_axis:%4.5f|g\n", gy);
-        printf(">z_axis:%4.5f|g\n", gz);
+        // printf(">x_axis:%4.5f|g\n", gx);
+        // printf(">y_axis:%4.5f|g\n", gy);
+        // printf(">z_axis:%4.5f|g\n", gz);
  
+        printf(">x_axis_raw:%d\n", raw_gx);
+        printf(">y_axis_raw:%d\n", raw_gy);
+        printf(">z_axis_raw:%d\n", raw_gz);
+
         snprintf(display_buf[5],60,"X-AXIS: ");
         snprintf(display_buf[6],60,"Y-AXIS: ");
         snprintf(display_buf[7],60,"Z-AXIS: ");
