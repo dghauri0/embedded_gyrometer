@@ -1,4 +1,61 @@
-#include <mbed.h>
+#include <mbed.h>                       // MBED Library.
+#include "drivers/LCD_DISCO_F429ZI.h"   // LCD Library.
+
+/* START: LCD Configuration */
+
+#define BACKGROUND 1
+#define FOREGROUND 0
+#define GRAPH_PADDING 5
+
+LCD_DISCO_F429ZI lcd;
+
+//buffer for holding displayed text strings
+char display_buf[2][60];
+uint32_t graph_width=lcd.GetXSize()-2*GRAPH_PADDING;
+uint32_t graph_height=graph_width;
+
+//sets the background layer 
+//to be visible, transparent, and
+//resets its colors to all black
+void setup_background_layer(){
+  lcd.SelectLayer(BACKGROUND);
+  lcd.Clear(LCD_COLOR_BLACK);
+  lcd.SetBackColor(LCD_COLOR_BLACK);
+  lcd.SetTextColor(LCD_COLOR_GREEN);
+  lcd.SetLayerVisible(BACKGROUND,ENABLE);
+  lcd.SetTransparency(BACKGROUND,0x7Fu);
+}
+
+//resets the foreground layer to
+//all black
+void setup_foreground_layer(){
+    lcd.SelectLayer(FOREGROUND);
+    lcd.Clear(LCD_COLOR_BLACK);
+    lcd.SetBackColor(LCD_COLOR_BLACK);
+    lcd.SetTextColor(LCD_COLOR_LIGHTGREEN);
+}
+
+//draws a rectangle with horizontal tick marks
+//on the background layer. The spacing between tick
+//marks in pixels is taken as a parameter
+void draw_graph_window(uint32_t horiz_tick_spacing){
+  lcd.SelectLayer(BACKGROUND);
+  
+  lcd.DrawRect(GRAPH_PADDING,GRAPH_PADDING,graph_width,graph_width);
+  //draw the x-axis tick marks
+  for (int32_t i = 0 ; i < graph_width;i+=horiz_tick_spacing){
+    lcd.DrawVLine(GRAPH_PADDING+i,graph_height,GRAPH_PADDING);
+  }
+}
+
+//maps inputY in the range minVal to maxVal, to a y-axis value pixel in the range
+//minPixelY to MaxPixelY
+uint16_t mapPixelY(float inputY,float minVal, float maxVal, int32_t minPixelY, int32_t maxPixelY){
+  const float mapped_pixel_y=(float)maxPixelY-(inputY)/(maxVal-minVal)*((float)maxPixelY-(float)minPixelY);
+  return mapped_pixel_y;
+}
+
+/* END: LCD Configuration */
 
 /* START: Gyroscope Register Addresses */
 
@@ -127,9 +184,36 @@ int main() {
 
     /* END: Write configurations to control registers. */
 
+    // Reboot condition. Gyroscope has data-ready interrupt configured already
+    // on second run. Pin level may rise before interrupt handler configured.  
+    // Manually check the signal and set the flag for the first sample.
     if(!(flags.get() & DATA_RDY_FLAG) && (int2.read() == 1)) {
         flags.set(DATA_RDY_FLAG);
     }
+
+    /* START: LCD-related */
+
+    setup_background_layer();
+
+    setup_foreground_layer();
+
+    //creates c-strings in the display buffers, in preparation
+    //for displaying them on the screen
+    snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
+    snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
+    lcd.SelectLayer(FOREGROUND);
+    //display the buffered string on the screen
+    lcd.DisplayStringAt(0, LINE(16), (uint8_t *)display_buf[1], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(17), (uint8_t *)display_buf[0], LEFT_MODE);
+
+    //draw the graph window on the background layer
+    // with x-axis tick marks every 10 pixels
+    draw_graph_window(10);
+
+
+    lcd.SelectLayer(FOREGROUND); 
+
+    /* END: LCD-related */
 
     while(1) {
         int16_t raw_gx, raw_gy, raw_gz;
