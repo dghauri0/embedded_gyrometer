@@ -10,7 +10,7 @@
 LCD_DISCO_F429ZI lcd;
 
 //buffer for holding displayed text strings
-char display_buf[9][60];
+char display_buf[10][60];
 
 //sets the background layer 
 //to be visible, transparent, and
@@ -188,10 +188,12 @@ int main() {
     // snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
     snprintf(display_buf[0],60,"The Embedded");
     snprintf(display_buf[1],60,"Gyrometer");
+    snprintf(display_buf[9],60,"Rev_A_12102023");
     lcd.SelectLayer(FOREGROUND);
     //display the buffered string on the screen
     lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(19), (uint8_t *)display_buf[9], RIGHT_MODE);
 
     //draw the graph window on the background layer
     // with x-axis tick marks every 10 pixels
