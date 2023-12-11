@@ -1,5 +1,6 @@
 #include <mbed.h>                       // MBED Library.
 #include "drivers/LCD_DISCO_F429ZI.h"   // LCD Library.
+#include <float.h>
 
 /* START: LCD Configuration */
 
@@ -10,7 +11,7 @@
 LCD_DISCO_F429ZI lcd;
 
 //buffer for holding displayed text strings
-char display_buf[10][60];
+char display_buf[22][60];
 
 //sets the background layer 
 //to be visible, transparent, and
@@ -204,6 +205,14 @@ int main() {
 
     /* END: LCD-related */
 
+    float gx_min = FLT_MAX;
+    float gy_min = FLT_MAX;
+    float gz_min = FLT_MAX;
+
+    float gx_max = FLT_MIN;
+    float gy_max = FLT_MIN;
+    float gz_max = FLT_MIN;
+
     while(1) {
         int16_t raw_gx, raw_gy, raw_gz;
         float gx, gy, gz;
@@ -222,6 +231,30 @@ int main() {
         gx = ((float)raw_gx) * SCALING_FACTOR;
         gy = ((float)raw_gy) * SCALING_FACTOR;
         gz = ((float)raw_gz) * SCALING_FACTOR;
+
+        if (gx < gx_min) {
+          gx_min = gx;
+        }
+
+        if (gy < gy_min) {
+          gy_min = gy;
+        }
+
+        if (gz < gz_min) {
+          gz_min = gz;
+        }
+
+        if (gx > gx_max) {
+          gx_max = gx;
+        }
+
+        if (gy > gy_max) {
+          gy_max = gy;
+        }
+
+        if (gz > gz_max) {
+          gz_max = gz;
+        }
         
         //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
         // printf(">x_axis:%4.5f|g\n", gx);
@@ -248,9 +281,44 @@ int main() {
         lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
         lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
 
+        // Record Max
+        snprintf(display_buf[10],60,"X-AX_MAX: ");
+        snprintf(display_buf[11],60,"Y-AX_MAX: ");
+        snprintf(display_buf[12],60,"Z-AX_MAX: ");
+
+        lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[10], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[11], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[12], LEFT_MODE);
+
+        snprintf(display_buf[13],60,"%4.5f|g", gx_max);
+        snprintf(display_buf[14],60,"%4.5f|g", gy_max);
+        snprintf(display_buf[15],60,"%4.5f|g", gz_max);
+
+        lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[13], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[14], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[15], RIGHT_MODE);
+
+        // Record Min
+        snprintf(display_buf[16],60,"X-AX_MIN: ");
+        snprintf(display_buf[17],60,"Y-AX_MIN: ");
+        snprintf(display_buf[18],60,"Z-AX_MIN: ");
+
+        lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[16], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[17], LEFT_MODE);
+        lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[18], LEFT_MODE);
+
+        snprintf(display_buf[19],60,"%4.5f|g", gx_min);
+        snprintf(display_buf[20],60,"%4.5f|g", gy_min);
+        snprintf(display_buf[21],60,"%4.5f|g", gz_min);
+
+        lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[19], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[20], RIGHT_MODE);
+        lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[21], RIGHT_MODE);
+
+
         thread_sleep_for(100); 
         
-        snprintf(display_buf[8],60,"          ");
+        snprintf(display_buf[8],60,"            ");
         lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
         lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
         lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
