@@ -122,8 +122,38 @@ void data_rdy_cb() {
 }
 
 void start_cb() {
+    
     button_pressed = true;
     t.start();
+}
+
+void reset_screen() {
+    setup_background_layer();
+    setup_foreground_layer();
+
+    //creates c-strings in the display buffers, in preparation
+    //for displaying them on the screen
+    // snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
+    // snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
+    snprintf(display_buf[0],60,"The Embedded");
+    snprintf(display_buf[1],60,"Gyrometer");
+    snprintf(display_buf[9],60,"Rev_A_12102023");
+    snprintf(display_buf[2],60,"Press Blue Button");
+    snprintf(display_buf[3],60,"To Start..");
+    lcd.SelectLayer(FOREGROUND);
+    //display the buffered string on the screen
+    lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(19), (uint8_t *)display_buf[9], RIGHT_MODE);
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
+
+    //draw the graph window on the background layer
+    // with x-axis tick marks every 10 pixels
+    //draw_graph_window(10);
+
+
+    lcd.SelectLayer(FOREGROUND); 
 }
 
 int main() {
@@ -200,28 +230,7 @@ int main() {
 
     /* START: LCD-related */
 
-    setup_background_layer();
-    setup_foreground_layer();
-
-    //creates c-strings in the display buffers, in preparation
-    //for displaying them on the screen
-    // snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
-    // snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
-    snprintf(display_buf[0],60,"The Embedded");
-    snprintf(display_buf[1],60,"Gyrometer");
-    snprintf(display_buf[9],60,"Rev_A_12102023");
-    lcd.SelectLayer(FOREGROUND);
-    //display the buffered string on the screen
-    lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
-    lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
-    lcd.DisplayStringAt(0, LINE(19), (uint8_t *)display_buf[9], RIGHT_MODE);
-
-    //draw the graph window on the background layer
-    // with x-axis tick marks every 10 pixels
-    //draw_graph_window(10);
-
-
-    lcd.SelectLayer(FOREGROUND); 
+    reset_screen();
 
     /* END: LCD-related */
 
@@ -255,39 +264,15 @@ int main() {
           gz = ((float)raw_gz) * SCALING_FACTOR;
 
           // Add to array!!!
-
-          if (gx < gx_min) {
-            gx_min = gx;
-          }
-
-          if (gy < gy_min) {
-            gy_min = gy;
-          }
-
-          if (gz < gz_min) {
-            gz_min = gz;
-          }
-
-          if (gx > gx_max) {
-            gx_max = gx;
-          }
-
-          if (gy > gy_max) {
-            gy_max = gy;
-          }
-
-          if (gz > gz_max) {
-            gz_max = gz;
-          }
           
           //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
           // printf(">x_axis:%4.5f|g\n", gx);
           // printf(">y_axis:%4.5f|g\n", gy);
           // printf(">z_axis:%4.5f|g\n", gz);
   
-          printf(">x_axis_raw:%d\n", raw_gx);
-          printf(">y_axis_raw:%d\n", raw_gy);
-          printf(">z_axis_raw:%d\n", raw_gz);
+          // printf(">x_axis_raw:%d\n", raw_gx);
+          // printf(">y_axis_raw:%d\n", raw_gy);
+          // printf(">z_axis_raw:%d\n", raw_gz);
 
           snprintf(display_buf[5],60,"X-AXIS: ");
           snprintf(display_buf[6],60,"Y-AXIS: ");
@@ -305,42 +290,7 @@ int main() {
           lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
           lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
 
-          // Record Max
-          snprintf(display_buf[10],60,"X-AX_MAX: ");
-          snprintf(display_buf[11],60,"Y-AX_MAX: ");
-          snprintf(display_buf[12],60,"Z-AX_MAX: ");
-
-          lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[10], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[11], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[12], LEFT_MODE);
-
-          snprintf(display_buf[13],60,"%4.5f|g", gx_max);
-          snprintf(display_buf[14],60,"%4.5f|g", gy_max);
-          snprintf(display_buf[15],60,"%4.5f|g", gz_max);
-
-          lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[13], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[14], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[15], RIGHT_MODE);
-
-          // Record Min
-          snprintf(display_buf[16],60,"X-AX_MIN: ");
-          snprintf(display_buf[17],60,"Y-AX_MIN: ");
-          snprintf(display_buf[18],60,"Z-AX_MIN: ");
-
-          lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[16], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[17], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[18], LEFT_MODE);
-
-          snprintf(display_buf[19],60,"%4.5f|g", gx_min);
-          snprintf(display_buf[20],60,"%4.5f|g", gy_min);
-          snprintf(display_buf[21],60,"%4.5f|g", gz_min);
-
-          lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[19], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[20], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[21], RIGHT_MODE);
-
-
-          thread_sleep_for(100); 
+          thread_sleep_for(100);
           
           snprintf(display_buf[8],60,"            ");
           lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
@@ -349,8 +299,11 @@ int main() {
         
         }
 
-        if (t.read() >= RECORD_TIME) {
+        float time_elapsed = t.read();
+        if (time_elapsed >= RECORD_TIME) {
+          printf("%f\n", time_elapsed);
           button_pressed = false;
+          reset_screen();
           t.reset();
         }
         //flags.clear(START_FLAG);
