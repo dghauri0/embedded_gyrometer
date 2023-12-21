@@ -10,12 +10,12 @@
 
 LCD_DISCO_F429ZI lcd;
 
-//buffer for holding displayed text strings
+// Buffer for holding displayed text strings.
 char display_buf[22][60];
 
-//sets the background layer 
-//to be visible, transparent, and
-//resets its colors to all black
+// Sets the background layer 
+// to be visible, transparent, and
+// resets its colors to all black.
 void setup_background_layer(){
   lcd.SelectLayer(BACKGROUND);
   lcd.Clear(LCD_COLOR_BLACK);
@@ -25,8 +25,8 @@ void setup_background_layer(){
   lcd.SetTransparency(BACKGROUND,0x7Fu);
 }
 
-//resets the foreground layer to
-//all black
+// Resets the foreground layer to
+// all black.
 void setup_foreground_layer(){
     lcd.SelectLayer(FOREGROUND);
     lcd.Clear(LCD_COLOR_BLACK);
@@ -87,8 +87,20 @@ void setup_foreground_layer(){
 
 /* END: Gyroscope Control Register Configurations */
 
+// Button pressed flag.
+volatile bool button_pressed = false;
+
 // EventFlags object construction.
 EventFlags flags;
+
+// Global constructor for LED DigitalOut.
+DigitalOut led1(LED1);
+
+// Global constructor for timer.
+Timer t;
+
+// Constructor for button on board.
+//DigitalIn din(PA_0);
 
 // SPI flag. Used for SPI transfers.
 #define SPI_FLAG 1
@@ -96,7 +108,7 @@ EventFlags flags;
 // Data ready flag. Used for gyroscope data ready interrupt.
 #define DATA_RDY_FLAG 2
 
-// Scaling factor
+// Scaling factor (Convert to radians per second)
 #define SCALING_FACTOR (17.5f * 0.017453292519943295769236907684886f / 1000.0f)
 
 // SPI callback function to service ISR.
@@ -107,6 +119,10 @@ void spi_cb(int event) {
 // Data ready callback function to service ISR.
 void data_rdy_cb() {
     flags.set(DATA_RDY_FLAG);
+}
+
+void start_cb() {
+    button_pressed = true;
 }
 
 int main() {
@@ -178,6 +194,9 @@ int main() {
         flags.set(DATA_RDY_FLAG);
     }
 
+    InterruptIn int_button(PA_0);
+    int_button.fall(&start_cb);
+
     /* START: LCD-related */
 
     setup_background_layer();
@@ -217,111 +236,119 @@ int main() {
         int16_t raw_gx, raw_gy, raw_gz;
         float gx, gy, gz;
 
-        flags.wait_all(DATA_RDY_FLAG);
-        write_buffer[0] = OUT_X_L | 0x80 | 0x40;
+        //flags.wait_all(START_FLAG, false);
+        if (button_pressed) {
 
-        spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
-        flags.wait_all(SPI_FLAG);
+          flags.wait_all(DATA_RDY_FLAG);
+          write_buffer[0] = OUT_X_L | 0x80 | 0x40;
 
-        // Process raw data
-        raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
-        raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
-        raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
+          spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
+          flags.wait_all(SPI_FLAG);
 
-        gx = ((float)raw_gx) * SCALING_FACTOR;
-        gy = ((float)raw_gy) * SCALING_FACTOR;
-        gz = ((float)raw_gz) * SCALING_FACTOR;
+          // Process raw data
+          raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
+          raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
+          raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
 
-        if (gx < gx_min) {
-          gx_min = gx;
-        }
+          gx = ((float)raw_gx) * SCALING_FACTOR;
+          gy = ((float)raw_gy) * SCALING_FACTOR;
+          gz = ((float)raw_gz) * SCALING_FACTOR;
 
-        if (gy < gy_min) {
-          gy_min = gy;
-        }
+          // Add to array!!!
 
-        if (gz < gz_min) {
-          gz_min = gz;
-        }
+          if (gx < gx_min) {
+            gx_min = gx;
+          }
 
-        if (gx > gx_max) {
-          gx_max = gx;
-        }
+          if (gy < gy_min) {
+            gy_min = gy;
+          }
 
-        if (gy > gy_max) {
-          gy_max = gy;
-        }
+          if (gz < gz_min) {
+            gz_min = gz;
+          }
 
-        if (gz > gz_max) {
-          gz_max = gz;
-        }
+          if (gx > gx_max) {
+            gx_max = gx;
+          }
+
+          if (gy > gy_max) {
+            gy_max = gy;
+          }
+
+          if (gz > gz_max) {
+            gz_max = gz;
+          }
+          
+          //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
+          // printf(">x_axis:%4.5f|g\n", gx);
+          // printf(">y_axis:%4.5f|g\n", gy);
+          // printf(">z_axis:%4.5f|g\n", gz);
+  
+          printf(">x_axis_raw:%d\n", raw_gx);
+          printf(">y_axis_raw:%d\n", raw_gy);
+          printf(">z_axis_raw:%d\n", raw_gz);
+
+          snprintf(display_buf[5],60,"X-AXIS: ");
+          snprintf(display_buf[6],60,"Y-AXIS: ");
+          snprintf(display_buf[7],60,"Z-AXIS: ");
+
+          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[5], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
+
+          snprintf(display_buf[2],60,"%4.5f|g", gx);
+          snprintf(display_buf[3],60,"%4.5f|g", gy);
+          snprintf(display_buf[4],60,"%4.5f|g", gz);
+
+          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
+
+          // Record Max
+          snprintf(display_buf[10],60,"X-AX_MAX: ");
+          snprintf(display_buf[11],60,"Y-AX_MAX: ");
+          snprintf(display_buf[12],60,"Z-AX_MAX: ");
+
+          lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[10], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[11], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[12], LEFT_MODE);
+
+          snprintf(display_buf[13],60,"%4.5f|g", gx_max);
+          snprintf(display_buf[14],60,"%4.5f|g", gy_max);
+          snprintf(display_buf[15],60,"%4.5f|g", gz_max);
+
+          lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[13], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[14], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[15], RIGHT_MODE);
+
+          // Record Min
+          snprintf(display_buf[16],60,"X-AX_MIN: ");
+          snprintf(display_buf[17],60,"Y-AX_MIN: ");
+          snprintf(display_buf[18],60,"Z-AX_MIN: ");
+
+          lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[16], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[17], LEFT_MODE);
+          lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[18], LEFT_MODE);
+
+          snprintf(display_buf[19],60,"%4.5f|g", gx_min);
+          snprintf(display_buf[20],60,"%4.5f|g", gy_min);
+          snprintf(display_buf[21],60,"%4.5f|g", gz_min);
+
+          lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[19], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[20], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[21], RIGHT_MODE);
+
+
+          thread_sleep_for(100); 
+          
+          snprintf(display_buf[8],60,"            ");
+          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
+          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
         
-        //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
-        // printf(">x_axis:%4.5f|g\n", gx);
-        // printf(">y_axis:%4.5f|g\n", gy);
-        // printf(">z_axis:%4.5f|g\n", gz);
- 
-        printf(">x_axis_raw:%d\n", raw_gx);
-        printf(">y_axis_raw:%d\n", raw_gy);
-        printf(">z_axis_raw:%d\n", raw_gz);
-
-        snprintf(display_buf[5],60,"X-AXIS: ");
-        snprintf(display_buf[6],60,"Y-AXIS: ");
-        snprintf(display_buf[7],60,"Z-AXIS: ");
-
-        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[5], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
-
-        snprintf(display_buf[2],60,"%4.5f|g", gx);
-        snprintf(display_buf[3],60,"%4.5f|g", gy);
-        snprintf(display_buf[4],60,"%4.5f|g", gz);
-
-        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
-
-        // Record Max
-        snprintf(display_buf[10],60,"X-AX_MAX: ");
-        snprintf(display_buf[11],60,"Y-AX_MAX: ");
-        snprintf(display_buf[12],60,"Z-AX_MAX: ");
-
-        lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[10], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[11], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[12], LEFT_MODE);
-
-        snprintf(display_buf[13],60,"%4.5f|g", gx_max);
-        snprintf(display_buf[14],60,"%4.5f|g", gy_max);
-        snprintf(display_buf[15],60,"%4.5f|g", gz_max);
-
-        lcd.DisplayStringAt(0, LINE(9), (uint8_t *)display_buf[13], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(10), (uint8_t *)display_buf[14], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(11), (uint8_t *)display_buf[15], RIGHT_MODE);
-
-        // Record Min
-        snprintf(display_buf[16],60,"X-AX_MIN: ");
-        snprintf(display_buf[17],60,"Y-AX_MIN: ");
-        snprintf(display_buf[18],60,"Z-AX_MIN: ");
-
-        lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[16], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[17], LEFT_MODE);
-        lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[18], LEFT_MODE);
-
-        snprintf(display_buf[19],60,"%4.5f|g", gx_min);
-        snprintf(display_buf[20],60,"%4.5f|g", gy_min);
-        snprintf(display_buf[21],60,"%4.5f|g", gz_min);
-
-        lcd.DisplayStringAt(0, LINE(13), (uint8_t *)display_buf[19], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(14), (uint8_t *)display_buf[20], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(15), (uint8_t *)display_buf[21], RIGHT_MODE);
-
-
-        thread_sleep_for(100); 
-        
-        snprintf(display_buf[8],60,"            ");
-        lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
-        lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
+        }
+        //flags.clear(START_FLAG);
     }
 
     return 0;
