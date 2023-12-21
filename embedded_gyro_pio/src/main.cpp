@@ -99,8 +99,8 @@ DigitalOut led1(LED1);
 // Global constructor for timer.
 Timer t;
 
-// Constructor for button on board.
-//DigitalIn din(PA_0);
+// Time to record values for.
+#define RECORD_TIME 20
 
 // SPI flag. Used for SPI transfers.
 #define SPI_FLAG 1
@@ -123,6 +123,7 @@ void data_rdy_cb() {
 
 void start_cb() {
     button_pressed = true;
+    t.start();
 }
 
 int main() {
@@ -236,7 +237,6 @@ int main() {
         int16_t raw_gx, raw_gy, raw_gz;
         float gx, gy, gz;
 
-        //flags.wait_all(START_FLAG, false);
         if (button_pressed) {
 
           flags.wait_all(DATA_RDY_FLAG);
@@ -347,6 +347,11 @@ int main() {
           lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
           lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
         
+        }
+
+        if (t.read() >= RECORD_TIME) {
+          button_pressed = false;
+          t.reset();
         }
         //flags.clear(START_FLAG);
     }
