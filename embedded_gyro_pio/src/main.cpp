@@ -120,6 +120,9 @@ volatile int vit_count = 0;
 // Helper iterator for interval.
 volatile float curr_interval = 0.5;
 
+// Keeps a global log of previously run total distance measure.
+volatile float total_distance_traveled = 0.0;
+
 // Time (seconds) to record values for.
 #define RECORD_TIME 20
 
@@ -138,8 +141,8 @@ volatile float curr_interval = 0.5;
 // Sampling Interval.
 #define SAMPLE_INTERVAL 0.5
 
-// Radius from gyroscope placement to axis of rotation (i.e., hip leg socket)
-#define RADIUS_ROT 0.19
+// Radius from gyroscope placement to axis of rotation for me in meters (i.e., hip leg socket).
+#define RADIUS_ROT 0.25
 
 // SPI callback function to service ISR.
 void spi_cb(int event) {
@@ -151,6 +154,7 @@ void data_rdy_cb() {
     flags.set(DATA_RDY_FLAG);
 }
 
+// Resets screen back to gyroscope boot.
 void reset_screen() {
     setup_background_layer();
     setup_foreground_layer();
@@ -217,7 +221,20 @@ void processing() {
     lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
     thread_sleep_for(1000);
 
+    // Store distance traveled and linear velocity.
     float distance_traveled = 0.0;
+    float linear_velocity = 0.0;
+
+    // Apply trapezoidal rule for numeric integration:
+    // v = (delta_time / 2) * (z_0 + 2*z_1 + 2*z_2 + 2*z_n-1 + z_n)
+    // Note, since we are attaching the gyroscope to one leg only and we have two legs,
+    // while the other leg is moving forward, the leg that has the gyroscope will be moving slightly
+    // backwards resulting in negative values. However, we need to count the absolute value of these
+    // negative values to account for the total distance traveled. Otherwise, we will only get half. 
+    //
+    // The trapezoidal rule is done in two parts.
+    // 1. (z_0 + 2*z_1 + 2*z_2 + 2*z_n-1 + z_n) -- this gives us angular displacement.
+    // 2. (delta_time / 2) -- this, multiplied by angular displacement, gives us linear velocity.
     int lower_bound = 0;
     for (int i = 0; i < SAMPLES - 1; i++) {
         float change_in_angle = 0.0;
@@ -228,14 +245,23 @@ void processing() {
                 change_in_angle += 2 * fabs((recorded_gyro_values_z[j] * SCALING_FACTOR));
             }
         }
-        change_in_angle *= (SAMPLE_INTERVAL / 2);
-        distance_traveled += (change_in_angle * RADIUS_ROT);
+
+        // The multiplicative term in the trapezoidal rule (delta_time / 2) gets
+        // multiplied by the change in angle (or angular displacement) to give us the 
+        // approximated linear velocity.
+        linear_velocity = change_in_angle * (SAMPLE_INTERVAL / 2);
+
+        // Multiplying linear velocity by radius to axis of rotation (v = omega * r)
+        // gives us the distance traveled.
+        distance_traveled += (linear_velocity * RADIUS_ROT);
         printf("Distance Traveled: %f\n", distance_traveled);
         lower_bound = value_index_track[i] + 1;
     }
 
-    printf("Total Distance Traveled: %f\n", distance_traveled);
-    snprintf(display_buf[2],60,"Total Distance Traveled:");
+    // After 40 samples have been processed, display distance traveled to user for 10 seconds.
+    printf("Total Distance Traveled: %f meters.\n", distance_traveled);
+    total_distance_traveled = distance_traveled;
+    snprintf(display_buf[2],60,"Total Distance:");
     snprintf(display_buf[3],60, "%f meters.", distance_traveled);
     lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
@@ -346,11 +372,8 @@ int main() {
             raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
 
             recorded_gyro_values_z[value_index] = raw_gz;
-            //printf("%d\n", recorded_gyro_values_z[value_index]);
             
             value_index++;
-            printf("%d\n\n", value_index);
-
 
             gx = ((float)raw_gx) * SCALING_FACTOR;
             gy = ((float)raw_gy) * SCALING_FACTOR;
@@ -364,9 +387,9 @@ int main() {
             lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
             lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
 
-            snprintf(display_buf[2],60,"%4.5f|g", gx);
-            snprintf(display_buf[3],60,"%4.5f|g", gy);
-            snprintf(display_buf[4],60,"%4.5f|g", gz);
+            snprintf(display_buf[2],60,"%4.5f rad/s", gx);
+            snprintf(display_buf[3],60,"%4.5f rad/s", gy);
+            snprintf(display_buf[4],60,"%4.5f rad/s", gz);
 
             lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
             lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
@@ -394,13 +417,13 @@ int main() {
             // Obtain time-stamps for 0.5 second interval capture.
             if (time_elapsed >= curr_interval) {
                 value_index_track[vit_count] = value_index - 1;
-                printf("  %d\n", value_index_track[vit_count]);
                 vit_count++;
                 curr_interval += 0.5;
             }
 
+            // If 20 seconds have elapsed, process data and reset.
             if (time_elapsed >= RECORD_TIME) {
-                printf("%f\n", time_elapsed);
+                printf("Time Elapsed: %f seconds.\n", time_elapsed);
                 button_pressed = false;
                 countdown = false;
                 led1 = 0;
