@@ -268,14 +268,14 @@ void processing() {
         lower_bound = value_index_track[i] + 1;
     }
 
-    // After 40 samples have been processed, display distance traveled to user for 10 seconds.
+    // After 40 samples have been processed, display distance traveled to user for 30 seconds.
     printf("Total Distance Traveled: %f meters.\n", distance_traveled);
     total_distance_traveled = distance_traveled;
     snprintf(display_buf[2],60,"Total Distance:");
     snprintf(display_buf[3],60, "%f meters.", distance_traveled);
     lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
-    thread_sleep_for(10000);
+    thread_sleep_for(30000);
 
 }
 
@@ -365,14 +365,17 @@ int main() {
             // Clear startup text instructions.
             reset_screen();
 
+            // On initial button press, start countdown and display on LCD.
             if (!countdown) {
                 countdown = true;
                 countdown_text();
             }
 
+            // Wait for data to be ready.
             flags.wait_all(DATA_RDY_FLAG);
             write_buffer[0] = OUT_X_L | 0x80 | 0x40;
 
+            // Read in gyro values.
             spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
             flags.wait_all(SPI_FLAG);
 
@@ -381,9 +384,13 @@ int main() {
             raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
             raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
 
+            // Store recorded RAW gyro z-axis values as that's our axis of interest.
             recorded_gyro_values_z[value_index] = raw_gz;
             
+            // Increment stored value index.
             value_index++;
+
+            /* START: Display Live rad/s Readings from each Axis on LCD */
 
             gx = ((float)raw_gx) * SCALING_FACTOR;
             gy = ((float)raw_gy) * SCALING_FACTOR;
@@ -411,6 +418,8 @@ int main() {
             lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
             lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
             lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
+
+            /* END: Display Live rad/s Readings from each Axis on LCD */
         
         } else {
 
