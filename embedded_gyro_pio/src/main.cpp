@@ -1,3 +1,13 @@
+/**
+ * @file main.cpp
+ *
+ * @brief The embedded gyrometer project for NYU's RTES (ECE-GY 6483)
+ *
+ * @author Dawood Ghauri
+ * Contact: dg4140@nyu.edu
+ *
+ */
+
 #include <mbed.h>                       // MBED Library.
 #include "drivers/LCD_DISCO_F429ZI.h"   // LCD Library.
 #include <float.h>
