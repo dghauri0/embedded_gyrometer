@@ -121,8 +121,29 @@ void data_rdy_cb() {
     flags.set(DATA_RDY_FLAG);
 }
 
+// Start recording data callback function to service ISR.
 void start_cb() {
-    
+
+    // TODO move this outside of ISR. Not the best idea..
+    reset_screen();
+    snprintf(display_buf[2],60,"3..");
+    thread_sleep_for(1000);
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+
+    snprintf(display_buf[2],60,"2..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+    reset_screen();
+
+    snprintf(display_buf[2],60,"1..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+    reset_screen();
+
+    snprintf(display_buf[2],60,"GO!");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(200);
+    reset_screen();
     button_pressed = true;
     t.start();
 }
@@ -138,15 +159,11 @@ void reset_screen() {
     snprintf(display_buf[0],60,"The Embedded");
     snprintf(display_buf[1],60,"Gyrometer");
     snprintf(display_buf[9],60,"Rev_A_12102023");
-    snprintf(display_buf[2],60,"Press Blue Button");
-    snprintf(display_buf[3],60,"To Start..");
     lcd.SelectLayer(FOREGROUND);
     //display the buffered string on the screen
     lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(19), (uint8_t *)display_buf[9], RIGHT_MODE);
-    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
-    lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
 
     //draw the graph window on the background layer
     // with x-axis tick marks every 10 pixels
@@ -154,6 +171,13 @@ void reset_screen() {
 
 
     lcd.SelectLayer(FOREGROUND); 
+}
+
+void startup_text() {
+    snprintf(display_buf[2],60,"Press Blue Button");
+    snprintf(display_buf[3],60,"To Start..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
 }
 
 int main() {
@@ -230,6 +254,7 @@ int main() {
 
     /* START: LCD-related */
 
+    // Set up the initial screen display.
     reset_screen();
 
     /* END: LCD-related */
@@ -248,57 +273,63 @@ int main() {
 
         if (button_pressed) {
 
-          flags.wait_all(DATA_RDY_FLAG);
-          write_buffer[0] = OUT_X_L | 0x80 | 0x40;
+            flags.wait_all(DATA_RDY_FLAG);
+            write_buffer[0] = OUT_X_L | 0x80 | 0x40;
 
-          spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
-          flags.wait_all(SPI_FLAG);
+            spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
+            flags.wait_all(SPI_FLAG);
 
-          // Process raw data
-          raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
-          raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
-          raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
+            // Process raw data
+            raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
+            raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
+            raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
 
-          gx = ((float)raw_gx) * SCALING_FACTOR;
-          gy = ((float)raw_gy) * SCALING_FACTOR;
-          gz = ((float)raw_gz) * SCALING_FACTOR;
+            gx = ((float)raw_gx) * SCALING_FACTOR;
+            gy = ((float)raw_gy) * SCALING_FACTOR;
+            gz = ((float)raw_gz) * SCALING_FACTOR;
 
-          // Add to array!!!
-          
-          //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
-          // printf(">x_axis:%4.5f|g\n", gx);
-          // printf(">y_axis:%4.5f|g\n", gy);
-          // printf(">z_axis:%4.5f|g\n", gz);
-  
-          // printf(">x_axis_raw:%d\n", raw_gx);
-          // printf(">y_axis_raw:%d\n", raw_gy);
-          // printf(">z_axis_raw:%d\n", raw_gz);
+            // TODO: Add to array!!! 
+            
+            //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
+            // printf(">x_axis:%4.5f|g\n", gx);
+            // printf(">y_axis:%4.5f|g\n", gy);
+            // printf(">z_axis:%4.5f|g\n", gz);
+    
+            // printf(">x_axis_raw:%d\n", raw_gx);
+            // printf(">y_axis_raw:%d\n", raw_gy);
+            // printf(">z_axis_raw:%d\n", raw_gz);
 
-          snprintf(display_buf[5],60,"X-AXIS: ");
-          snprintf(display_buf[6],60,"Y-AXIS: ");
-          snprintf(display_buf[7],60,"Z-AXIS: ");
+            snprintf(display_buf[5],60,"X-AXIS: ");
+            snprintf(display_buf[6],60,"Y-AXIS: ");
+            snprintf(display_buf[7],60,"Z-AXIS: ");
 
-          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[5], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
-          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
+            lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[5], LEFT_MODE);
+            lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[6], LEFT_MODE);
+            lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[7], LEFT_MODE);
 
-          snprintf(display_buf[2],60,"%4.5f|g", gx);
-          snprintf(display_buf[3],60,"%4.5f|g", gy);
-          snprintf(display_buf[4],60,"%4.5f|g", gz);
+            snprintf(display_buf[2],60,"%4.5f|g", gx);
+            snprintf(display_buf[3],60,"%4.5f|g", gy);
+            snprintf(display_buf[4],60,"%4.5f|g", gz);
 
-          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
+            lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], RIGHT_MODE);
+            lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], RIGHT_MODE);
+            lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[4], RIGHT_MODE);
 
-          thread_sleep_for(100);
-          
-          snprintf(display_buf[8],60,"            ");
-          lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
-          lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
+            thread_sleep_for(100);
+            
+            snprintf(display_buf[8],60,"            ");
+            lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[8], RIGHT_MODE);
+            lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[8], RIGHT_MODE);
+            lcd.DisplayStringAt(0, LINE(7), (uint8_t *)display_buf[8], RIGHT_MODE);
         
+        } else {
+
+            // Keep displaying startup text.
+            startup_text();
         }
 
+        // Record values until time limit has been reached. 
+        // Then, wait for user's button press again.
         float time_elapsed = t.read();
         if (time_elapsed >= RECORD_TIME) {
           printf("%f\n", time_elapsed);
@@ -306,7 +337,6 @@ int main() {
           reset_screen();
           t.reset();
         }
-        //flags.clear(START_FLAG);
     }
 
     return 0;
