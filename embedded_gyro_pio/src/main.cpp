@@ -102,8 +102,19 @@ DigitalOut led1(LED1);
 // Global constructor for timer.
 Timer t;
 
-// Time to record values for.
-#define RECORD_TIME 5
+// Statically allocated location in memory for recorded z gyroscope values. 
+// In my testing, the max recorded values for my capture settings was around 150 values;
+// however, I've allocated extra just in case. 
+volatile int16_t recorded_gyro_values_z[300];
+
+// Keeps track of how many values have been captured (value_index - 1).
+// Also, provides an index for the values in the preceding array. 
+volatile int value_index = 0;
+
+volatile int temp_count = 0;
+
+// Time (seconds) to record values for.
+#define RECORD_TIME 20
 
 // SPI flag. Used for SPI transfers.
 #define SPI_FLAG 1
@@ -128,23 +139,17 @@ void reset_screen() {
     setup_background_layer();
     setup_foreground_layer();
 
-    //creates c-strings in the display buffers, in preparation
-    //for displaying them on the screen
-    // snprintf(display_buf[0],60,"width: %d pixels",lcd.GetXSize());
-    // snprintf(display_buf[1],60,"height: %d pixels",lcd.GetYSize());
+    // Creates c-strings in the display buffers, in preparation
+    // for displaying them on the screen.
     snprintf(display_buf[0],60,"The Embedded");
     snprintf(display_buf[1],60,"Gyrometer");
     snprintf(display_buf[9],60,"Rev_A_12102023");
     lcd.SelectLayer(FOREGROUND);
-    //display the buffered string on the screen
+
+    // Display the buffered string on the screen.
     lcd.DisplayStringAt(0, LINE(0), (uint8_t *)display_buf[0], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(1), (uint8_t *)display_buf[1], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(19), (uint8_t *)display_buf[9], RIGHT_MODE);
-
-    //draw the graph window on the background layer
-    // with x-axis tick marks every 10 pixels
-    //draw_graph_window(10);
-
 
     lcd.SelectLayer(FOREGROUND); 
 }
@@ -152,9 +157,10 @@ void reset_screen() {
 // Start recording data callback function to service ISR.
 void start_cb() {
     button_pressed = true;
-
+    led1 = 1;
 }
 
+// Display UI helper text on LCD on how to start use of the system.
 void startup_text() {
     snprintf(display_buf[2],60,"Press Blue Button");
     snprintf(display_buf[3],60,"To Start..");
@@ -162,6 +168,8 @@ void startup_text() {
     lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
 }
 
+// Helper text to give user time to prepare before starting walk for more accurate readings
+// (i.e., reduce human error).
 void countdown_text() {
     reset_screen();
     snprintf(display_buf[2],60,"3..");
@@ -183,7 +191,18 @@ void countdown_text() {
     thread_sleep_for(200);
     reset_screen();
 
+    // After user has been given the "GO!" signal, we'll start timer to start recording values.
     t.start();
+}
+
+// Processes data (i.e., convert measured data to forward movement velocity and then distance).
+void processing() {
+    snprintf(display_buf[2],60,"Processing..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+
+    //float sum
+    //float gz = ((float)raw_gz) * SCALING_FACTOR;
 }
 
 int main() {
@@ -222,9 +241,7 @@ int main() {
     write_buffer[0] = 0x8f;
     spi.transfer(write_buffer, 2, read_buffer, 2, spi_cb);
     flags.wait_all(SPI_FLAG);
-    //thread_sleep_for(5000);
     printf("Gyroscope Identifier (WHOAMI) = 0x%X\n", read_buffer[1]);
-    //thread_sleep_for(5000);
 
     /* START: Write configurations to control registers. */
 
@@ -256,7 +273,7 @@ int main() {
     }
 
     InterruptIn int_button(PA_0);
-    int_button.fall(&start_cb);
+    int_button.rise(&start_cb);
 
     /* START: LCD-related */
 
@@ -264,14 +281,6 @@ int main() {
     reset_screen();
 
     /* END: LCD-related */
-
-    float gx_min = FLT_MAX;
-    float gy_min = FLT_MAX;
-    float gz_min = FLT_MAX;
-
-    float gx_max = FLT_MIN;
-    float gy_max = FLT_MIN;
-    float gz_max = FLT_MIN;
 
     while(1) {
         int16_t raw_gx, raw_gy, raw_gz;
@@ -293,16 +302,22 @@ int main() {
             spi.transfer(write_buffer, 7, read_buffer, 7, spi_cb);
             flags.wait_all(SPI_FLAG);
 
-            // Process raw data
+            // Real-time pre-processing of raw data.
             raw_gx = (((uint16_t)read_buffer[2]) << 8) | ((uint16_t)read_buffer[1]);
             raw_gy = (((uint16_t)read_buffer[4]) << 8) | ((uint16_t)read_buffer[3]);
             raw_gz = (((uint16_t)read_buffer[6]) << 8) | ((uint16_t)read_buffer[5]);
 
+            recorded_gyro_values_z[value_index] = raw_gz;
+            //printf("%d\n", recorded_gyro_values_z[value_index]);
+            
+            value_index++;
+            //printf("%d\n\n", value_index);
+
+
             gx = ((float)raw_gx) * SCALING_FACTOR;
             gy = ((float)raw_gy) * SCALING_FACTOR;
-            gz = ((float)raw_gz) * SCALING_FACTOR;
+            gz = ((float)raw_gz) * SCALING_FACTOR; 
 
-            // TODO: Add to array!!! 
             
             //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
             // printf(">x_axis:%4.5f|g\n", gx);
@@ -340,7 +355,6 @@ int main() {
 
             // Keep displaying startup text.
             startup_text();
-            // TODO move this outside of ISR. Not the best idea..
            
         }
 
@@ -348,13 +362,24 @@ int main() {
         // Then, wait for user's button press again.
         if (button_pressed) {
             float time_elapsed = t.read();
+
+            // maybe.
+            if (fmod(time_elapsed, 0.5) <= 0.12) {
+                temp_count++;
+                printf("%d\n", temp_count);
+            }
+
             if (time_elapsed >= RECORD_TIME) {
                 printf("%f\n", time_elapsed);
                 button_pressed = false;
                 countdown = false;
+                led1 = 0;
+                value_index = 0;
                 reset_screen();
                 t.stop();
                 t.reset();
+
+                processing();
             }
         }
     }
