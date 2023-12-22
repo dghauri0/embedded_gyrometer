@@ -163,7 +163,7 @@ void reset_screen() {
     // for displaying them on the screen.
     snprintf(display_buf[0],60,"The Embedded");
     snprintf(display_buf[1],60,"Gyrometer");
-    snprintf(display_buf[9],60,"Rev_A_12102023");
+    snprintf(display_buf[9],60,"Rev_B_12222023");
     lcd.SelectLayer(FOREGROUND);
 
     // Display the buffered string on the screen.
