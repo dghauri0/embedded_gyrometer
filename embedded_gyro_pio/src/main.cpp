@@ -107,11 +107,18 @@ Timer t;
 // however, I've allocated extra just in case. 
 volatile int16_t recorded_gyro_values_z[300];
 
-// Keeps track of how many values have been captured (value_index - 1).
+// Provides a track of the outer bound of recorded_gyro_values within a given 0.5s interval.
+volatile int value_index_track[45];
+
+// Keeps track of how many values have been captured.
 // Also, provides an index for the values in the preceding array. 
 volatile int value_index = 0;
 
-volatile int temp_count = 0;
+// Helper iterator for populating value_index_track array.
+volatile int vit_count = 0;
+
+// Helper iterator for interval.
+volatile float curr_interval = 0.5;
 
 // Time (seconds) to record values for.
 #define RECORD_TIME 20
@@ -124,6 +131,15 @@ volatile int temp_count = 0;
 
 // Scaling factor (Convert to radians per second)
 #define SCALING_FACTOR (17.5f * 0.017453292519943295769236907684886f / 1000.0f)
+
+// Total Samples (20 seconds / 0.5 seconds).
+#define SAMPLES 40
+
+// Sampling Interval.
+#define SAMPLE_INTERVAL 0.5
+
+// Radius from gyroscope placement to axis of rotation (i.e., hip leg socket)
+#define RADIUS_ROT 0.19
 
 // SPI callback function to service ISR.
 void spi_cb(int event) {
@@ -201,8 +217,30 @@ void processing() {
     lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
     thread_sleep_for(1000);
 
-    //float sum
-    //float gz = ((float)raw_gz) * SCALING_FACTOR;
+    float distance_traveled = 0.0;
+    int lower_bound = 0;
+    for (int i = 0; i < SAMPLES - 1; i++) {
+        float change_in_angle = 0.0;
+        for (int j = lower_bound; j <= value_index_track[i]; j++) {
+            if (j == lower_bound || j == value_index_track[i]) {
+                change_in_angle += fabs((recorded_gyro_values_z[j] * SCALING_FACTOR));
+            } else {
+                change_in_angle += 2 * fabs((recorded_gyro_values_z[j] * SCALING_FACTOR));
+            }
+        }
+        change_in_angle *= (SAMPLE_INTERVAL / 2);
+        distance_traveled += (change_in_angle * RADIUS_ROT);
+        printf("Distance Traveled: %f\n", distance_traveled);
+        lower_bound = value_index_track[i] + 1;
+    }
+
+    printf("Total Distance Traveled: %f\n", distance_traveled);
+    snprintf(display_buf[2],60,"Total Distance Traveled:");
+    snprintf(display_buf[3],60, "%f meters.", distance_traveled);
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
+    thread_sleep_for(10000);
+
 }
 
 int main() {
@@ -311,22 +349,12 @@ int main() {
             //printf("%d\n", recorded_gyro_values_z[value_index]);
             
             value_index++;
-            //printf("%d\n\n", value_index);
+            printf("%d\n\n", value_index);
 
 
             gx = ((float)raw_gx) * SCALING_FACTOR;
             gy = ((float)raw_gy) * SCALING_FACTOR;
             gz = ((float)raw_gz) * SCALING_FACTOR; 
-
-            
-            //printf("RAW -> \t\tgx: %d \t gy: %d \t gz: %d\t\n", raw_gx, raw_gy, raw_gz);
-            // printf(">x_axis:%4.5f|g\n", gx);
-            // printf(">y_axis:%4.5f|g\n", gy);
-            // printf(">z_axis:%4.5f|g\n", gz);
-    
-            // printf(">x_axis_raw:%d\n", raw_gx);
-            // printf(">y_axis_raw:%d\n", raw_gy);
-            // printf(">z_axis_raw:%d\n", raw_gz);
 
             snprintf(display_buf[5],60,"X-AXIS: ");
             snprintf(display_buf[6],60,"Y-AXIS: ");
@@ -363,10 +391,12 @@ int main() {
         if (button_pressed) {
             float time_elapsed = t.read();
 
-            // maybe.
-            if (fmod(time_elapsed, 0.5) <= 0.12) {
-                temp_count++;
-                printf("%d\n", temp_count);
+            // Obtain time-stamps for 0.5 second interval capture.
+            if (time_elapsed >= curr_interval) {
+                value_index_track[vit_count] = value_index - 1;
+                printf("  %d\n", value_index_track[vit_count]);
+                vit_count++;
+                curr_interval += 0.5;
             }
 
             if (time_elapsed >= RECORD_TIME) {
@@ -375,11 +405,14 @@ int main() {
                 countdown = false;
                 led1 = 0;
                 value_index = 0;
+                vit_count = 0;
+                curr_interval = 0.5;
                 reset_screen();
                 t.stop();
                 t.reset();
 
                 processing();
+                reset_screen();
             }
         }
     }
