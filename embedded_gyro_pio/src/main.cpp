@@ -90,6 +90,9 @@ void setup_foreground_layer(){
 // Button pressed flag.
 volatile bool button_pressed = false;
 
+// Helper flag for countdown sequence text.
+volatile bool countdown = false;
+
 // EventFlags object construction.
 EventFlags flags;
 
@@ -100,7 +103,7 @@ DigitalOut led1(LED1);
 Timer t;
 
 // Time to record values for.
-#define RECORD_TIME 20
+#define RECORD_TIME 5
 
 // SPI flag. Used for SPI transfers.
 #define SPI_FLAG 1
@@ -119,33 +122,6 @@ void spi_cb(int event) {
 // Data ready callback function to service ISR.
 void data_rdy_cb() {
     flags.set(DATA_RDY_FLAG);
-}
-
-// Start recording data callback function to service ISR.
-void start_cb() {
-
-    // TODO move this outside of ISR. Not the best idea..
-    reset_screen();
-    snprintf(display_buf[2],60,"3..");
-    thread_sleep_for(1000);
-    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
-
-    snprintf(display_buf[2],60,"2..");
-    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
-    thread_sleep_for(1000);
-    reset_screen();
-
-    snprintf(display_buf[2],60,"1..");
-    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
-    thread_sleep_for(1000);
-    reset_screen();
-
-    snprintf(display_buf[2],60,"GO!");
-    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
-    thread_sleep_for(200);
-    reset_screen();
-    button_pressed = true;
-    t.start();
 }
 
 void reset_screen() {
@@ -173,11 +149,41 @@ void reset_screen() {
     lcd.SelectLayer(FOREGROUND); 
 }
 
+// Start recording data callback function to service ISR.
+void start_cb() {
+    button_pressed = true;
+
+}
+
 void startup_text() {
     snprintf(display_buf[2],60,"Press Blue Button");
     snprintf(display_buf[3],60,"To Start..");
     lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
     lcd.DisplayStringAt(0, LINE(6), (uint8_t *)display_buf[3], LEFT_MODE);
+}
+
+void countdown_text() {
+    reset_screen();
+    snprintf(display_buf[2],60,"3..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+
+    snprintf(display_buf[2],60,"2..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+    reset_screen();
+
+    snprintf(display_buf[2],60,"1..");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(1000);
+    reset_screen();
+
+    snprintf(display_buf[2],60,"GO!");
+    lcd.DisplayStringAt(0, LINE(5), (uint8_t *)display_buf[2], LEFT_MODE);
+    thread_sleep_for(200);
+    reset_screen();
+
+    t.start();
 }
 
 int main() {
@@ -273,6 +279,14 @@ int main() {
 
         if (button_pressed) {
 
+            // Clear startup text instructions.
+            reset_screen();
+
+            if (!countdown) {
+                countdown = true;
+                countdown_text();
+            }
+
             flags.wait_all(DATA_RDY_FLAG);
             write_buffer[0] = OUT_X_L | 0x80 | 0x40;
 
@@ -326,16 +340,22 @@ int main() {
 
             // Keep displaying startup text.
             startup_text();
+            // TODO move this outside of ISR. Not the best idea..
+           
         }
 
         // Record values until time limit has been reached. 
         // Then, wait for user's button press again.
-        float time_elapsed = t.read();
-        if (time_elapsed >= RECORD_TIME) {
-          printf("%f\n", time_elapsed);
-          button_pressed = false;
-          reset_screen();
-          t.reset();
+        if (button_pressed) {
+            float time_elapsed = t.read();
+            if (time_elapsed >= RECORD_TIME) {
+                printf("%f\n", time_elapsed);
+                button_pressed = false;
+                countdown = false;
+                reset_screen();
+                t.stop();
+                t.reset();
+            }
         }
     }
 
