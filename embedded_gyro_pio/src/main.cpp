@@ -118,6 +118,7 @@ Timer t;
 volatile int16_t recorded_gyro_values_z[300];
 
 // Provides a track of the outer bound of recorded_gyro_values within a given 0.5s interval.
+// Again, statically allocated to a little bit above the 40 values. 
 volatile int value_index_track[45];
 
 // Keeps track of how many values have been captured.
@@ -173,7 +174,7 @@ void reset_screen() {
     // for displaying them on the screen.
     snprintf(display_buf[0],60,"The Embedded");
     snprintf(display_buf[1],60,"Gyrometer");
-    snprintf(display_buf[9],60,"Rev_B_12222023");
+    snprintf(display_buf[9],60,"Rev_C_12222023");
     lcd.SelectLayer(FOREGROUND);
 
     // Display the buffered string on the screen.
@@ -243,7 +244,7 @@ void processing() {
     // negative values to account for the total distance traveled. Otherwise, we will only get half. 
     //
     // The trapezoidal rule is done in two parts.
-    // 1. (z_0 + 2*z_1 + 2*z_2 + 2*z_n-1 + z_n) -- this gives us angular displacement.
+    // 1. (z_0 + 2*z_1 + 2*z_2 + ... + 2*z_n-1 + z_n) -- this gives us angular displacement.
     // 2. (delta_time / 2) -- this, multiplied by angular displacement, gives us linear velocity.
     int lower_bound = 0;
     for (int i = 0; i < SAMPLES - 1; i++) {
