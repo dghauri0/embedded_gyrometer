@@ -1,5 +1,5 @@
 # embedded_gyrometer
-Embedded Challenge Project for NYU's Real Time Embedded Systems Course (ECE-GY 6483). </br> </br>
+Embedded Challenge Project for NYU's Real Time Embedded Systems Course (ECE-GY 6483). Coding and testing done on STM32F429I-DISC1 board. </br> </br>
 
 <p align="center">
   <img src="icon.svg" width="350" title="Person Walking">
